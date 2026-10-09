@@ -1,69 +1,146 @@
-# SwingPro2
+# SwingPro - 高尔夫挥杆分析平台
 
-独立的视频管理代码基础，使用 FastAPI、PostgreSQL、Redis、Celery 和原生 HTML/CSS/JavaScript。
+SwingPro 是一个专注于高尔夫挥杆分析的综合平台，提供用户管理、视频上传与处理等功能。本项目包含高性能的后端 API 服务以及基础的 Web 前端管理界面。
 
-保留用户与角色权限、邀请码、常用打球人、微信绑定、视频上传及元数据处理、封面、机位筛选、收藏、主从视频播放、画线 JSON 保存与下载、批量下载和管理统计。视频所属用户与机位由业务操作维护。
+## 🎯 核心功能
 
-不包含自动人物识别、自动分类、FuseNet 页面、识别标签 API、模型或识别结果导入。仓库只有功能代码和配置示例，不携带历史 Git 记录、服务器配置、业务数据、账号种子、日志或部署凭据。
+- **用户系统**
+  - 多角色支持：普通用户、管理员等
+  - 完整的认证流程：密码登录、验证码登录、Token 刷新。
+  - 邀请码注册机制。
+- **视频管理**
+  - 视频上传、存储与元数据管理。
+  - 自动提取缩略图与视频分析结果。
+  - 连接微信生态：支持绑定微信
+- **球员管理 (Players)**
+  - 系统用户可管理“常用打球人”。
+  - 绑定微信用户信息，支持多对多关系。
+- **后台管理**
+  - 完善的权限控制系统。
+  - 业务行为审计日志 。
+  - 系统资源与业务数据统计大屏接口。
 
-## 本地运行
+## 🛠 技术栈
 
-需要 Python 3.11、PostgreSQL 16、Redis 7，以及 PATH 中可用的 `ffmpeg` 和 `ffprobe`。使用独立本地数据库。
+### 后端
+- **框架**: [FastAPI](https://fastapi.tiangolo.com/) - 高性能 Python Web 框架
+- **数据库**: PostgreSQL (驱动: psycopg2-binary, ORM: SQLAlchemy 2.0)
+- **任务队列**: Celery + Redis - 处理视频分析等耗时任务
+- **认证**: OAuth2 + JWT (python-jose, passlib)
 
-Apple Silicon 需可执行的 ARM 或通用版本媒体工具，可先运行 `ffmpeg -version`、`ffprobe -version` 检查。旧 Intel 工具在未安装 Rosetta 的机器上无法直接运行。
+### 前端
+- 原生 HTML/CSS/JavaScript
+- 位于 `web/` 目录，通过后端静态资源挂载服务
 
-```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-cp .env.example .env
+### 其他配置
+- **Nginx**: 反向代理 (配置在 `reverse-proxy/`)
+- **Docker** (推荐用于部署数据库和 Redis)
+
+## 📂 项目结构
+
+```text
+SwingPro/
+├── app/                    # 核心后端代码
+│   ├── api/                # API 路由定义 (Endpoint)
+│   ├── core/               # 核心配置 (Config, Security, Logging)
+│   ├── db/                 # 数据库模型与会话管理
+│   ├── schemas/            # Pydantic 数据验证模型
+│   ├── services/           # 复杂业务逻辑层
+│   └── main.py             # 应用入口
+├── web/                    # 前端静态资源
+├── scripts/                # 运维与初始化脚本
+├── docs/                   # 项目文档
+├── files/ & video/         # 媒体文件存储目录
+└── requirements.txt        # Python 依赖清单
 ```
 
-编辑 `.env`，填写自己的 `PG_PASSWORD`、随机 `JWT_SECRET`（至少32字符），按本地服务修改数据库及 Redis 地址。示例占位值不能启动。可用 `python -c 'import secrets; print(secrets.token_urlsafe(48))'` 生成 JWT 密钥。
+## 🚀 快速开始指南
 
-已有 PostgreSQL 和 Redis 可直接使用；若通过 Docker 启动独立依赖，先运行 Docker，再执行：
-
+### 1. 环境准备
+确保本地安装 Python 3.10+、PostgreSQL 和 Redis。
 ```bash
-docker compose --env-file .env -f examples/compose.example.yaml up -d
+conda create -n swingpro python=3.11 -y
+conda activate swingpro
+```
+安装PostgreSQL与redis并将其启动，版本要求如下：
+(PostgreSQL) 16.13
+Redis server v=7.0.15+
+
+### 2. 安装依赖
+```bash
+pip install -r requirements.txt
 ```
 
-在项目根目录初始化空数据库，创建自己的管理账号。密码通过终端交互输入，没有默认账号。
+### 3. 配置环境
+创建新数据库：
+```sql
+CREATE DATABASE swingpro_db;
+```
+项目使用 `app/core/config.py` 管理配置，建议创建 `.env` 文件或设置环境变量来配置数据库连接，请注意修改路径配置：
+```bash
+# 示例配置
+# PostgreSQL
+export PG_HOST=localhost
+export PG_PORT=5432
+export PG_USER=postgres
+export PG_PASSWORD=yourpassword
+export PG_DB=swingpro_db
+export REDIS_URL=redis://localhost:6379/0
+# Redis（可为空；为空则自动用内存存 OTP）
+REDIS_URL=redis://localhost:6379/1
+# Celery 任务队列（NEW）
+CELERY_BROKER_URL=redis://localhost:6379/1
+CELERY_RESULT_BACKEND=redis://localhost:6379/1
+CELERY_DEFAULT_QUEUE=swingpro
+CELERY_TIMEZONE=Asia/Shanghai
+CELERY_TASK_ALWAYS_EAGER=True  # 设置 True 时可在本地同步执行任务（调试用）
+# 存储目录配置（统一放在 files 目录下）
+VIDEO_ROOT=/Users/swh/PythonProjects/SwingPro/files/video
+THUMB_ROOT=/Users/swh/PythonProjects/SwingPro/files/thumbs
+VIDEO_TMP_ROOT=/Users/swh/PythonProjects/SwingPro/files/tmp
+# 日志配置
+LOG_LEVEL=INFO
+LOG_DIR=/Users/swh/PythonProjects/SwingPro/logs
+LOG_JSON_FORMAT=True
+```
 
+### 4. 初始化数据库
+使用提供的脚本初始化表结构并导入基础数据：
 ```bash
 python -m scripts.init_db
-python -m scripts.create_admin --telephone YOUR_11_DIGIT_NUMBER
-uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-在另一终端激活同一虚拟环境，启动元数据任务 worker：
+*注：可通过 `python -m scripts.seed_users` 创建测试系统管理员用户。（目前版本的角色有user、business、admin、super_admin、system_admin）*
 
+### 5. 启动服务
+
+**启动 Web 服务器**
 ```bash
-celery -A app.core.celery_app:celery_app worker --loglevel=info --pool=solo
+# 开发模式
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+# 生产模式（使用 Gunicorn）
+gunicorn -w 4 -k uvicorn.workers.UvicornWorker app.main:app --bind 127.0.0.1:8000
 ```
 
-macOS 开发使用 `solo`；无需 beat 或 GPU/识别 worker。单进程快速调试可在私有 `.env` 中设置 `CELERY_TASK_ALWAYS_EAGER=true`，同步执行元数据任务。
-
-访问 [登录页](http://127.0.0.1:8000/users/login/)、[视频库](http://127.0.0.1:8000/platform.html)、[API文档](http://127.0.0.1:8000/docs) 或 [健康检查](http://127.0.0.1:8000/health)。Web 管理入口使用管理角色；普通用户 API 保留。
-
-## 配置和存储
-
-- `app/core/config.py` 仅读取根目录 `.env` 和进程环境，进程环境优先；全部字段见 `.env.example`。
-- 相对存储路径按项目根目录解析，首次启动创建存储目录；存储、日志、虚拟环境和私有 `.env` 均被 Git 忽略。
-- `SMS_PROVIDER=local` 仅供开发，在终端显示验证码，不发送真实短信。短信/微信需填写自己的应用凭据，默认未接入。
-- `CORS_ORIGINS` 支持 JSON 数组或逗号分隔地址，同源开发使用空列表。
-- `scripts/init_db.py` 用于新数据库；`scripts/init_access_control.py` 初始化权限策略。不附带历史迁移或业务回填脚本。
-
-这是一份独立基础版本；上线前需要自己的媒体访问策略、部署配置和完整业务验收。示例不是生产部署。
-
-保留的框架版本在本地静态媒体服务中返回完整文件（HTTP 200）；生产环境若需要 Range 分段读取，应配置支持该能力的媒体服务。
-
-## 验证
-
+**启动 Celery Worker (用于处理视频任务)**
 ```bash
-python -m unittest discover -s tests -v
-node --check web/platform.js
-node --check web/player.js
-node --check web/users/login/auth.js
+celery -A app.core.celery_app worker --loglevel=info
 ```
 
-测试使用本地临时配置，不连接远程数据库。维护记录见 `AGNETS.md`。
+本地使用 http://127.0.0.1:8000/docs 访问 Swagger UI 进行 API 测试。
+本地使用 http://127.0.0.1:8000/platform.html 或 http://127.0.0.1:8000/users/login/index.html 访问用户登录页面。
+
+## 📝 开发指南
+
+- **API 文档**: 启动服务后访问 `http://localhost:8000/docs` 查看 Swagger UI。
+- **代码规范**: 请遵循 PEP 8 规范，业务逻辑尽量下沉至 `app/services/` 层，保持 API 层轻量。
+- **数据库迁移**: 修改模型后，请确保同步更新数据库 Schema
+- **日志**: 使用 `app/core/logging.py` 定义的日志系统，日志文件存储在 `logs/` 目录。
+- **错误处理**: 统一使用 FastAPI 的异常处理机制，确保 API 返回一致的错误格式。
+
+## 📂 文件存储
+- 视频文件存储在 `files/video/` 目录。
+- 缩略图存储在 `files/thumbs/` 目录。
+- 临时文件存储在 `files/tmp/` 目录。
+请注意修改env文件中的路径配置以适应您的环境，并确保这些目录存在并具有适当的读写权限。
+请确保这些目录存在并具有适当的读写权限。
