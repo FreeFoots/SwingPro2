@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SwingPro2 视频播放</title>
+  <link rel="stylesheet" href="/player.css" />
+</head>
+<body>
+  <main class="player-page">
+    <header class="player-topbar">
+      <a class="back-link" id="back-link" href="/platform.html">返回视频库</a>
+      <div class="title-group">
+        <h1 id="video-title">视频播放</h1>
+        <p id="video-meta"></p>
+      </div>
+    </header>
+
+    <section class="players-container" id="players-container" aria-label="视频播放器"></section>
+
+    <p class="player-status" id="player-status"></p>
+  </main>
+
+  <script src="/player.js"></script>
+</body>
+</html>
